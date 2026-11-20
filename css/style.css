@@ -1,0 +1,217 @@
+/* ==========================================================================
+   style.css — design tokens, reset and base typography.
+
+   Every colour in Luma is a CSS variable. Dark is the default set below;
+   [data-theme="light"] swaps in the light set. Components only ever use
+   var(--something), so switching theme is just changing one attribute
+   on <html>.
+   ========================================================================== */
+
+:root {
+  color-scheme: dark; /* tells the browser to draw date pickers, scrollbars dark */
+
+  /* ---- Surfaces (darkest to lightest) ---- */
+  --bg: #0E0E10;          /* behind everything */
+  --panel: #151517;       /* the main content panel */
+  --raised: #18181B;      /* cards, hovered rows */
+  --raised-2: #1A1A1D;    /* hover on nav, unplanned items */
+  --raised-2-hover: #1E1E22;
+  --control: #1B1B1F;     /* buttons, inputs */
+  --control-hover: #232328;
+  --selected: #1F1F23;    /* the current nav item */
+  --track: #26262B;       /* empty part of progress bars */
+
+  /* ---- Lines ---- */
+  --line-soft: #1D1D21;   /* row dividers, hour lines */
+  --line: #232327;        /* card borders */
+  --line-strong: #2A2A30; /* control borders */
+  --line-strong-2: #2F2F35;
+  --checkbox: #4A4A52;
+
+  /* ---- Text ---- */
+  --text-strong: #F2F2F4; /* headings */
+  --text: #E8E8EA;        /* body */
+  --text-btn: #D4D4DA;    /* button labels */
+  --text-2: #B4B4BC;      /* secondary */
+  --text-2b: #A0A0A8;     /* tabs, segmented controls */
+  --text-3: #8A8A93;      /* muted meta */
+
+  /* ---- Brand and status ---- */
+  --accent: #8B83D9;      /* primary lavender: main buttons, focus */
+  --accent-hover: #9C95E2;
+  --accent-soft: #A9A3EA; /* active nav icon */
+  --on-accent: #121018;   /* text on the accent */
+  --green: #45A982;
+  --amber: #E5AD57;
+  --red: #DC6875;
+  --amber-text: #EBC283;
+  --red-text: #E88591;
+
+  --shadow: none;
+  --scrim: rgba(8, 8, 10, 0.7);
+
+  /* ---- Course and category colours ---- */
+  --c-blue: #5B9CF6;
+  --c-purple: #B58CF2;
+  --c-orange: #E0A04F;
+  --c-teal: #4FC1B0;
+  --c-pink: #E58AB0;
+  --c-sky: #6FB5D6;
+  --c-grey: #A0A0A8;
+
+  /* ---- Type ---- */
+  --font: 'Inter', system-ui, -apple-system, sans-serif;
+  --fs-body: 13.5px;
+  --fs-small: 12.5px;
+  --fs-h1: 28px;
+  --fs-h2: 15px;
+
+  /* ---- Shape ---- */
+  --r-sm: 6px;   /* nav items, icon buttons */
+  --r-md: 7px;   /* buttons, inputs */
+  --r-lg: 10px;  /* cards */
+  --r-xl: 12px;  /* main panel */
+  --r-pill: 999px;
+}
+
+/* Light theme: same names, new values (the brief's original palette) */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --bg: #F7F7FB;
+  --panel: #FFFFFF;
+  --raised: #FBFBFE;
+  --raised-2: #F4F4F9;
+  --raised-2-hover: #EEEEF5;
+  --control: #FFFFFF;
+  --control-hover: #F4F4F9;
+  --selected: #F0EEFF;
+  --track: #ECECF2;
+
+  --line-soft: #EFEFF4;
+  --line: #E6E6EE;
+  --line-strong: #DCDCE6;
+  --line-strong-2: #CFCFDB;
+  --checkbox: #B9BCC8;
+
+  --text-strong: #243047;
+  --text: #283044;
+  --text-btn: #3A4256;
+  --text-2: #4C5468;
+  --text-2b: #5E6578;
+  --text-3: #6B7183;
+
+  --accent-soft: #6E66C9;
+  --green: #2B7A5B;
+  --amber: #9A6410;
+  --red: #C44A5A;
+  --amber-text: #8A5A0E;
+  --red-text: #B23E4E;
+
+  --shadow: 0 1px 2px rgba(36, 48, 71, 0.06);
+  --scrim: rgba(36, 48, 71, 0.32);
+}
+
+/* ---- Reset ---- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: var(--fs-body);
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, p, ul, ol {
+  margin: 0;
+}
+
+ul, ol {
+  padding: 0;
+  list-style: none;
+}
+
+button, input, select, textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--text-strong);
+}
+
+svg {
+  flex: none;
+}
+
+/* One visible focus ring for everything you can Tab to */
+:focus-visible {
+  outline: 2px solid var(--accent-soft);
+  outline-offset: 2px;
+}
+
+/* ---- Typography ---- */
+.h1 {
+  font-size: var(--fs-h1);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: var(--text-strong);
+}
+
+.h2 {
+  font-size: var(--fs-h2);
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.muted {
+  color: var(--text-3);
+}
+
+.small {
+  font-size: var(--fs-small);
+}
+
+/* Numbers line up in columns */
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Hidden visually but still read by screen readers */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+  }
+}

@@ -2,7 +2,7 @@
 
 Read this alongside the master brief (`LUMA_BRIEF.md`). Where they differ, this file wins: these are decisions made after the brief.
 
-Mockups (reference only, not code to copy): https://claude.ai/artifact/SLQyoAH6QAe85bpfjmzn6A, using the **"bold direction (v2)"** row.
+Mockups (reference only, not code to copy): https://claude.ai/artifact/TcztuEyr5oDewx98hACLjs, the "Luma screens" canvas with a **Dark** row and a **Light** row (Dashboard, My Tasks, Task form, Planner, Deadlines, Courses, Settings). This replaces the earlier "bold direction (v2)" mockups.
 
 ## 1. Technical decisions (all recommended defaults accepted)
 
@@ -16,66 +16,80 @@ Mockups (reference only, not code to copy): https://claude.ai/artifact/SLQyoAH6Q
 8. **Overdue:** a task with a due time is overdue after that time. A date-only task is overdue from the next day. "Due soon" means today through +7 days. A passed deadline never changes status.
 9. **Checkbox and status stay in sync.** Ticking sets `Completed` and `completedAt`. Reopening sets `To Do` and clears `completedAt`.
 10. **Import:** the user chooses Merge (keep existing records on an ID clash) or Replace all, and sees a summary ("12 added, 3 skipped") before anything is written.
-11. **Theme:** light/dark toggle, built in Milestone 6.
-12. **"Plan my day"** opens today's Daily Planner with the unscheduled panel in view.
-13. **Overlaps:** blocks sit side by side, with a gentle warning banner.
-14. **Milestone 1** shows each screen's real empty state. The Add Task modal opens and closes, and saving arrives in Milestone 2.
+11. **Theme:** dark, light or system, built in Milestone 1 (the new design has a theme toggle in the sidebar). The preference is stored in Local Storage under `luma.theme`; the default is "system". A small inline script in `<head>` applies it before the page draws, so there is no flash of the wrong theme.
+12. **"Plan my day"** opens today's Daily Planner (`#/planner/today`) with the "Not planned yet" panel in view.
+13. **Overlaps:** blocks sit side by side, with a gentle amber warning banner.
+14. **Milestone 1** shows each screen's real empty state. The task form is a **full page** at `#/tasks/new` (not a modal): it opens, validates and goes back, and saving arrives in Milestone 2. Milestone 2 reuses the same page for Edit task.
 15. **All data goes through a small store API from Milestone 2**, so Milestone 3 only swaps in Local Storage.
-16. **Extra files:** `js/ui.js` for toasts, modal and confirm dialogs.
+16. **Extra files:** `js/ui.js` (toasts now, confirm dialogs from Milestone 2), `js/theme.js` (theme switching), `js/icons.js` (shared SVG icons), `js/task-form.js` (the task page) and `js/settings.js` (one module per screen).
+17. **Routing:** hash routes `#/dashboard`, `#/tasks`, `#/tasks/new`, `#/planner`, `#/deadlines`, `#/courses`, `#/settings`. Anything after `?` is a query (for example `#/tasks/new?date=2026-11-20` pre-fills the work-session date). Unknown routes go to the dashboard.
 
-Small UX extras agreed: Today / Tomorrow / Next week date chips, an **N** shortcut for Add Task, "Load sample data" in Settings, Undo toast after completing a task, and a mobile bottom tab bar with a floating + button.
+Small UX extras agreed: Today / Tomorrow / Next week date chips, an **N** shortcut for a new task, "Load sample data" in Settings, Undo toast after completing a task, and a mobile bottom tab bar with a floating + button.
 
 **Parked for later (do not build yet):** reminders and notifications. The idea is in-app reminders plus optional browser notifications in Milestone 6, then a PWA and .ics calendar export after the MVP.
 
-## 2. Design direction: "bold" (neo-brutalist, Qlack-inspired)
+## 2. Design direction: calm, dark-first app UI
 
-Warm paper, thick ink outlines, hard offset shadows with no blur, one baby-blue accent, flat colour.
+A quiet, Linear-style interface: dark by default with a matching light theme, Inter throughout, one lavender accent, thin 1px borders, small radii and line icons. The light theme uses the brief's original palette.
 
 ### Colour tokens
 
-| Token | Hex | Use |
-|---|---|---|
-| `--ink` | `#141310` | All text, outlines, hard shadows, primary button fill |
-| `--paper` | `#F3EFE6` | Page background; text on ink |
-| `--card` | `#FFFDF8` | Cards, inputs, secondary buttons |
-| `--sunk` | `#E9E4D9` | Sunken panels, completed rows, "soon" tags |
-| `--desk` | `#DCD7CC` | Modal backdrop |
-| `--line-soft` | `#E6E1D6` | Row dividers, planner hour lines |
-| `--line-dashed` | `#A8A398` | Dashed outline for unscheduled items |
-| `--ink-2` | `#3A372F` | Secondary text |
-| `--ink-3` | `#5A564D` | Muted meta and labels |
-| `--ink-4` | `#6B665C` | Muted labels, **only** on paper or card |
-| `--accent` | `#A9CBFF` | Baby blue. Only for "yours / selected / main action" |
+All colours are CSS variables in `css/style.css`. Dark values sit on `:root`; `:root[data-theme="light"]` overrides them.
 
-**Course palette** (the user picks one per course; text on these is always `--ink`): mint `#7FD8BE`, lilac `#B9A2FF`, orange `#FFB25B`, pink `#FF8FB8`, lime `#C6F432`. Personal or uncategorized uses `--card` with an ink outline.
+| Token | Dark | Light | Use |
+|---|---|---|---|
+| `--bg` | `#0E0E10` | `#F7F7FB` | Behind everything |
+| `--panel` | `#151517` | `#FFFFFF` | The main content panel |
+| `--raised` | `#18181B` | `#FBFBFE` | Cards, hovered rows |
+| `--raised-2` | `#1A1A1D` | `#F4F4F9` | Nav hover, group headers |
+| `--control` | `#1B1B1F` | `#FFFFFF` | Buttons and inputs |
+| `--control-hover` | `#232328` | `#F4F4F9` | Button hover, selected tab |
+| `--selected` | `#1F1F23` | `#F0EEFF` | Current nav item |
+| `--track` | `#26262B` | `#ECECF2` | Empty part of progress bars |
+| `--line-soft` | `#1D1D21` | `#EFEFF4` | Row dividers, hour lines |
+| `--line` | `#232327` | `#E6E6EE` | Card and panel borders |
+| `--line-strong` | `#2A2A30` | `#DCDCE6` | Control borders |
+| `--text-strong` | `#F2F2F4` | `#243047` | Headings |
+| `--text` | `#E8E8EA` | `#283044` | Body text |
+| `--text-2` | `#B4B4BC` | `#4C5468` | Secondary text, form labels |
+| `--text-3` | `#8A8A93` | `#6B7183` | Muted meta |
+| `--accent` | `#8B83D9` | `#8B83D9` | Primary buttons, focus, today's date |
+| `--accent-soft` | `#A9A3EA` | `#6E66C9` | Active nav icon, focus ring |
+| `--green` | `#45A982` | `#2B7A5B` | Completed, progress |
+| `--amber` | `#E5AD57` | `#9A6410` | Due soon, deadlines, in progress |
+| `--red` | `#DC6875` | `#C44A5A` | Overdue, errors, delete |
+
+Light mode adds a faint shadow (`0 1px 2px rgba(36, 48, 71, 0.06)`) to cards and the panel; dark mode has none.
+
+**Course palette** (shown as 8px dots and course badges): blue `#5B9CF6`, purple `#B58CF2`, orange `#E0A04F`, teal `#4FC1B0`, pink `#E58AB0`, sky `#6FB5D6`, grey `#A0A0A8`. General categories: Academic uses the accent, Personal grey, Extracurricular pink, Work sky, Projects green.
 
 ### Type
 
-- **Familjen Grotesk** (400–700) for headings and body. **DM Mono** (400/500) for labels, numbers, dates and tags. Both from Google Fonts.
-- h1 64px / 700 / -0.04em / line-height 0.95. h2 32px / 700 / -0.02em. Lead 22px. Body 17px / 1.5.
-- Labels: DM Mono 13px, UPPERCASE, letter-spacing 0.1em.
-- Headings end with a period ("My tasks."). Buttons use sentence case.
+- **Inter** (400–700) from Google Fonts for everything. Numbers use `font-variant-numeric: tabular-nums` so they line up.
+- h1 28px / 700 / -0.02em. h2 15px / 600. Body 13.5px / 1.45. Small and meta text 12.5px.
+- Headings have no trailing period ("My Tasks"). Screen names use title case in navigation; buttons use sentence case ("Add task", "Plan my day").
 
 ### Shape
 
-- **Radius:** tag 6, rail 8, input 10, button 12, row 14, card 16, hero 20, pill 999.
-- **Border:** hair 2px (dividers, tags), chip 2.5px (pills), base 3px (default), hero 4px (dialog).
-- **Shadows (no blur ever):**
-  - xs: `3px 3px 0 var(--ink)`
-  - md: `6px 6px 0 var(--ink)`
-  - card: `10px 10px 0 var(--ink)`
-  - hero: `14px 14px 0 var(--ink)`
-  - cta: `6px 6px 0 var(--accent), 6px 6px 0 3px var(--ink)`
-- **Selected state:** accent fill, lifted 2–4px up and left, with a bigger ink shadow.
-- **Hover:** lift 2px. **Press:** push into the shadow over 80ms.
-- **Focus:** `outline: 3px solid var(--ink); outline-offset: 3px`.
+- **Radius:** nav items and icon buttons 6, buttons and inputs 7, segmented controls 8, cards 10, main panel and course cards 12, pills 999.
+- **Borders:** 1px everywhere. Dashed 1px for "add" placeholders.
+- **Layout:** a 220px sidebar on the background, and the content in one rounded panel with an 8px gap around it.
+- **Focus:** `outline: 2px solid var(--accent-soft); outline-offset: 2px`.
+
+### Components
+
+- **Buttons:** 32px tall. Default is `--control` with a `--line-strong` border; primary is solid lavender with dark text.
+- **Segmented control** for Day/Week, Priority, Status and Theme. The pressed option gets a `--line-strong` fill.
+- **Tabs** (My Tasks views) are rounded pills with counts.
+- **Priority:** a small 3-bar signal icon plus a text label; Urgent uses a red square with "!".
+- **Status pills:** To do (grey), In progress (amber), Completed (green), each with a tinted background.
+- **Progress:** a thin green bar beside "Today's tasks", and a green ring on the Daily progress card.
+- **Deadlines:** collapsible groups (Overdue red, Due soon amber, Upcoming grey) with a date tile on each row.
+- **Planner:** week header with a load bar per day; today's date in a lavender circle; work sessions are dashed-outline blocks, classes or events are tinted blocks.
+- **Errors:** red field border plus red helper text under the field.
 
 ### Rules
 
-- Primary button (ink fill with the cta shadow) appears **once per screen**: the sidebar's Add task.
-- At most **one tilted sticker per screen** for playful copy ("almost there", "rest day", "due date ≠ work time").
-- **No icon set.** Nav items are numbered 01–06, plus glyphs → ← + ✕ ✓.
-- Priority is a **4-bar meter plus a text label**, not colour. Overdue is a solid ink "OVERDUE" tag. Form errors get a pink "fix" tag with ink text.
-- Progress uses a **progress rail**: accent fill, 10% ticks and a checkered finish.
-- No gradients except the rail's ticks and checker. No emoji.
-- Touch targets are at least 44px. Mobile gets the bottom tab bar and a floating + button.
+- **Line icons** (16px, 1.5px stroke, `currentColor`) from `js/icons.js`. No emoji.
+- The primary button may appear in the sidebar and once in a page header.
+- Touch targets are at least 44px on phones. On phones the sidebar becomes a top bar, a bottom tab bar (Home, Tasks, Planner, Due, Courses) and a floating + button. The mockups don't cover phones, so this layout is our own.

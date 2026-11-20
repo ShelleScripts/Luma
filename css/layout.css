@@ -1,0 +1,254 @@
+/* ==========================================================================
+   layout.css — the app shell: sidebar, the main panel, and the phone-only
+   top bar, bottom tab bar and floating + button.
+   ========================================================================== */
+
+.app {
+  display: flex;
+  gap: 8px;
+  min-height: 100vh;
+  padding: 8px;
+}
+
+/* ---- Sidebar ---- */
+.side {
+  position: sticky;
+  top: 8px;
+  flex: 0 0 220px;
+  height: calc(100vh - 16px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 4px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 40px;
+  padding: 0 8px;
+  margin-bottom: 8px;
+}
+
+.brand__name {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text-strong);
+}
+
+/* The lavender ring logo; its inner circle uses the page background */
+.brand__logo-hole {
+  fill: var(--bg);
+}
+
+.side__cta {
+  margin: 0 4px 16px;
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: var(--r-sm);
+  color: var(--text-2);
+  font-weight: 500;
+}
+
+.nav:hover {
+  background: var(--raised-2);
+}
+
+.nav svg {
+  color: var(--text-3);
+}
+
+/* aria-current="page" marks the screen you're on */
+.nav[aria-current="page"] {
+  background: var(--selected);
+  color: var(--text-strong);
+}
+
+.nav[aria-current="page"] svg {
+  color: var(--accent-soft);
+}
+
+.nav__count {
+  margin-left: auto;
+  font-size: 11.5px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.side__section {
+  margin: 20px 10px 6px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text-3);
+}
+
+.side__bottom {
+  margin-top: auto;
+}
+
+/* ---- Main panel ---- */
+.main {
+  flex: 1 1 auto;
+  min-width: 0;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow);
+}
+
+/* tabindex="-1" lets the router move focus here without a ring */
+.main:focus {
+  outline: none;
+}
+
+/* Standard page padding and spacing inside the panel */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  padding: 40px 48px 48px;
+}
+
+.page--narrow {
+  max-width: 1080px;
+}
+
+.page--form {
+  max-width: 860px;
+  gap: 22px;
+  padding-top: 32px;
+}
+
+.page-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 16px;
+}
+
+.page-header__text {
+  flex: 1 1 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.page-header__eyebrow {
+  font-weight: 500;
+  color: var(--text-3);
+}
+
+.page-header__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Two columns that wrap on narrow screens (dashboard, planner) */
+.split {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.split__main {
+  flex: 999 1 460px;
+  min-width: 0;
+}
+
+.split__side {
+  flex: 1 1 280px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ---- Phone-only chrome (hidden on desktop; see responsive.css) ---- */
+.topbar,
+.tabbar,
+.fab {
+  display: none;
+}
+
+.topbar {
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 8px 4px;
+}
+
+.topbar__actions {
+  display: flex;
+  gap: 4px;
+}
+
+.tabbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 2px;
+  padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
+  background: var(--panel);
+  border-top: 1px solid var(--line);
+}
+
+.tabbar__link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 48px;
+  border-radius: var(--r-md);
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text-3);
+}
+
+.tabbar__link[aria-current="page"] {
+  background: var(--selected);
+  color: var(--text-strong);
+}
+
+.tabbar__link[aria-current="page"] svg {
+  color: var(--accent-soft);
+}
+
+.fab {
+  position: fixed;
+  right: 18px;
+  bottom: calc(80px + env(safe-area-inset-bottom));
+  z-index: 21;
+  width: 52px;
+  height: 52px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+.fab:hover {
+  background: var(--accent-hover);
+  color: var(--on-accent);
+}
+
+.topbar .icon-btn {
+  width: 44px;
+  height: 44px;
+}
