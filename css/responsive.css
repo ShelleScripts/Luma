@@ -1,0 +1,90 @@
+/* ==========================================================================
+   responsive.css — how the layout changes on smaller screens.
+   Loaded last so these rules win over the desktop ones.
+   ========================================================================== */
+
+/* ---- Tablet: less padding ---- */
+@media (max-width: 1100px) {
+  .page {
+    padding: 32px 28px 40px;
+  }
+
+  .planner-head {
+    padding: 28px 28px 16px;
+  }
+
+  .hours {
+    padding-left: 28px;
+  }
+}
+
+/* ---- Phone: swap the sidebar for a top bar + bottom tab bar ---- */
+@media (max-width: 760px) {
+  .app {
+    display: block;
+    padding: 0;
+  }
+
+  .side {
+    display: none;
+  }
+
+  .topbar {
+    display: flex;
+  }
+
+  .tabbar {
+    display: grid;
+  }
+
+  .fab {
+    display: flex;
+  }
+
+  /* The panel fills the screen, with room at the bottom for the tab bar */
+  .main {
+    border-width: 1px 0 0;
+    border-radius: var(--r-xl) var(--r-xl) 0 0;
+    min-height: calc(100vh - 56px);
+    padding-bottom: 140px;
+  }
+
+  .page {
+    gap: 20px;
+    padding: 24px 16px 32px;
+  }
+
+  .planner-head {
+    padding: 24px 16px 12px;
+  }
+
+  .hours {
+    padding: 8px 16px 16px;
+  }
+
+  .planner-aside {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+
+  /* Four stats become a 2 × 2 grid */
+  .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .stat:nth-child(3) {
+    border-left: 0;
+  }
+
+  .stat:nth-child(n + 3) {
+    border-top: 1px solid var(--line);
+  }
+
+  .grid-2 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .toasts {
+    bottom: calc(140px + env(safe-area-inset-bottom));
+  }
+}
