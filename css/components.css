@@ -1385,6 +1385,47 @@ textarea.field {
   color: var(--on-accent);
 }
 
+/* ---- Choice dialog (import: Merge or Replace all) ---- */
+.choices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 16px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  cursor: pointer;
+}
+
+.choice:hover {
+  background: var(--control-hover);
+}
+
+/* :has() lets the box react to the radio inside it being picked */
+.choice:has(input:checked) {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.choice input {
+  margin-top: 3px;
+  accent-color: var(--accent);
+}
+
+.choice__text b {
+  display: block;
+  font-weight: 500;
+  color: var(--text-strong);
+}
+
 /* Quiet red: "Delete task" on the edit page */
 .btn--ghost-danger {
   background: transparent;

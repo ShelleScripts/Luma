@@ -13,7 +13,7 @@
 // =============================================================================
 
 import { makeId, isValidISODate } from './utils.js';
-import { loadData, saveData, backupCorrupt, STORAGE_KEY } from './storage.js';
+import { loadData, saveData, backupCorrupt, removeBackup, STORAGE_KEY, STORAGE_VERSION } from './storage.js';
 
 // ---------------------------------------------------------------------------
 // Fixed lists (the form's options and their labels)
@@ -49,7 +49,9 @@ export const COURSE_COLORS = [
 ];
 const COLOR_VALUES = COURSE_COLORS.map((c) => c.value);
 
-const DEFAULT_SETTINGS = { displayName: '' };
+// weekStart: which day the weekly planner begins on, "monday" or "sunday"
+const DEFAULT_SETTINGS = { displayName: '', weekStart: 'monday' };
+export const WEEK_STARTS = ['monday', 'sunday'];
 
 // ---------------------------------------------------------------------------
 // The data, held in memory while the app runs
@@ -199,6 +201,7 @@ function cleanSettings(raw) {
   if (!raw || typeof raw !== 'object') return {};
   const result = {};
   if (isText(raw.displayName)) result.displayName = raw.displayName.slice(0, 40);
+  if (WEEK_STARTS.includes(raw.weekStart)) result.weekStart = raw.weekStart;
   return result;
 }
 
@@ -399,6 +402,170 @@ function syncCompletion(task, now) {
   } else {
     task.completedAt = null;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Your data: backups, import, snapshots and clearing (Milestone 6)
+// ---------------------------------------------------------------------------
+
+/**
+ * A full, separate copy of the data. Big changes (an import, clearing
+ * everything, loading sample data) take one first, so they can be undone.
+ * JSON.parse(JSON.stringify(x)) is a simple way to copy plain data deeply.
+ */
+export function takeSnapshot() {
+  return JSON.parse(JSON.stringify({ tasks, categories, settings }));
+}
+
+/** Puts back everything exactly as it was when the snapshot was taken. */
+export function restoreSnapshot(snapshot) {
+  tasks = snapshot.tasks.map(copy);
+  categories = snapshot.categories.map((c) => ({ ...c }));
+  settings = { ...snapshot.settings };
+  announceChange();
+}
+
+/**
+ * Everything worth backing up, as one plain object for a .json file.
+ * The five general categories aren't included: every Luma has them already.
+ */
+export function exportData() {
+  return {
+    app: 'Luma',
+    version: STORAGE_VERSION,
+    exportedAt: new Date().toISOString(),
+    tasks: getTasks(),
+    categories: getCourses(),
+    settings: getSettings(),
+  };
+}
+
+/**
+ * Step 1 of an import: checks the data from a file WITHOUT changing anything.
+ * Every record goes through the same checks as data loaded at start-up.
+ *
+ * Returns { error: "message" } if the file can't be used. Otherwise returns
+ * the cleaned records plus what each choice would do (decision 10):
+ *   { incoming, dropped, merge: { tasks, courses, skippedTasks, skippedCourses },
+ *     replace: { tasks, courses } }
+ * The counts are numbers, so the dialog can show them before anything is saved.
+ */
+export function prepareImport(data) {
+  const notLuma = "This file isn't a Luma backup, so nothing was imported.";
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return { error: notLuma };
+  if (!Array.isArray(data.tasks) && !Array.isArray(data.categories)) return { error: notLuma };
+  if (typeof data.version === 'number' && data.version > STORAGE_VERSION) {
+    return { error: 'This backup was made by a newer version of Luma, so it can’t be imported here.' };
+  }
+
+  const cleaned = cleanTasks(data.tasks);
+  const incoming = {
+    tasks: cleaned.tasks,
+    courses: cleanCategories(data.categories).filter((c) => c.kind === 'course'),
+    settings: cleanSettings(data.settings),
+  };
+  if (incoming.tasks.length === 0 && incoming.courses.length === 0) {
+    return { error: 'There are no tasks or courses in this file, so there was nothing to import.' };
+  }
+
+  const merge = combine(getCourses(), tasks, incoming);
+  const replace = combine([], [], incoming);
+  return {
+    incoming,
+    dropped: cleaned.dropped,
+    merge: {
+      tasks: merge.tasks.length,
+      courses: merge.courses.length,
+      skippedTasks: incoming.tasks.length - merge.tasks.length,
+      skippedCourses: incoming.courses.length - merge.courses.length,
+    },
+    replace: { tasks: replace.tasks.length, courses: replace.courses.length },
+  };
+}
+
+/**
+ * Step 2 of an import, once the user has chosen:
+ *   "merge"    keeps everything you have and adds what's new. A task or
+ *              course whose id you already have is skipped (yours is kept).
+ *   "replace"  swaps all your tasks, courses and settings for the file's.
+ * Returns a snapshot of the data from before, for Undo.
+ */
+export function applyImport(prepared, mode) {
+  const before = takeSnapshot();
+  const { incoming } = prepared;
+
+  if (mode === 'replace') {
+    const result = combine([], [], incoming);
+    tasks = result.tasks;
+    categories = [...cleanCategories([]), ...result.courses];
+    settings = { ...DEFAULT_SETTINGS, ...incoming.settings };
+  } else {
+    // Worked out again here (not reused from step 1) in case the data
+    // changed in another tab while the dialog was open
+    const result = combine(getCourses(), tasks, incoming);
+    tasks = [...tasks, ...result.tasks];
+    categories = [...categories, ...result.courses];
+  }
+
+  announceChange();
+  return before;
+}
+
+/**
+ * Works out which incoming records to add on top of the ones we keep.
+ *
+ *   - A task whose id is already taken is skipped.
+ *   - A course whose id is taken, OR whose name matches a course we already
+ *     have (names must be unique), is skipped, and its tasks are moved to
+ *     the course we already have, so nothing ends up in the wrong place.
+ *   - A task pointing to a course that doesn't exist becomes Uncategorized.
+ *
+ * Returns { tasks, courses }: only the NEW records.
+ */
+function combine(keptCourses, keptTasks, incoming) {
+  const nameKey = (name) => name.trim().toLowerCase();
+  const courseIds = new Set(keptCourses.map((c) => c.id));
+  const idByName = new Map(keptCourses.map((c) => [nameKey(c.name), c.id]));
+  const renamed = new Map(); // an incoming course id -> the id of the course we kept
+  const newCourses = [];
+
+  for (const course of incoming.courses) {
+    const sameName = idByName.get(nameKey(course.name));
+    if (courseIds.has(course.id)) continue;           // already have it
+    if (sameName) {
+      renamed.set(course.id, sameName);               // same course, different id
+      continue;
+    }
+    newCourses.push({ ...course });
+    courseIds.add(course.id);
+    idByName.set(nameKey(course.name), course.id);
+  }
+
+  const known = new Set([...DEFAULT_CATEGORIES.map((c) => c.id), ...courseIds]);
+  const taskIds = new Set(keptTasks.map((t) => t.id));
+  const newTasks = incoming.tasks
+    .filter((task) => !taskIds.has(task.id))
+    .map((task) => {
+      const categoryId = renamed.get(task.categoryId) || task.categoryId;
+      return { ...task, categoryId: known.has(categoryId) ? categoryId : '' };
+    });
+
+  return { tasks: newTasks, courses: newCourses };
+}
+
+/**
+ * Removes every task, course and setting (the general categories come
+ * back, as on a first visit). Returns a snapshot of the data from before,
+ * for Undo.
+ */
+export function clearAllData() {
+  const before = takeSnapshot();
+  tasks = [];
+  categories = cleanCategories([]);
+  settings = { ...DEFAULT_SETTINGS };
+  removeBackup();
+  announceChange();
+  return before;
 }
 
 // Load the saved data as soon as this file is first imported

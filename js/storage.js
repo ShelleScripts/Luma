@@ -82,3 +82,12 @@ export function backupCorrupt(raw) {
   }
   return key;
 }
+
+/** Deletes that backup copy (used by "Clear all data" in Settings). */
+export function removeBackup() {
+  try {
+    localStorage.removeItem(`${STORAGE_KEY}.backup`);
+  } catch {
+    // Storage is off; there's no backup to remove anyway
+  }
+}
