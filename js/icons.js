@@ -17,6 +17,7 @@ export const icons = {
   chevronRight: (s = 14) => svg(s, '<path d="M6 3.5L10.5 8 6 12.5"/>', 'stroke-width="1.75"'),
   chevronDown: (s = 14) => svg(s, '<path d="M3.5 6L8 10.5 12.5 6"/>', 'stroke-width="1.75"'),
   pencil: (s = 15) => svg(s, '<path d="M3 13l.6-2.6L10.8 3.2a1.4 1.4 0 0 1 2 2L5.6 12.4z"/>'),
+  close: (s = 14) => svg(s, '<path d="M4 4l8 8M12 4l-8 8"/>'),
   trash: (s = 15) => svg(s, '<path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.6 8.5h5.8l.6-8.5"/>'),
 
   /** The tick inside a completed checkbox. */

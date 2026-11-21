@@ -3,6 +3,7 @@
 //
 //   #/tasks/new                  -> empty form, "Save task" creates a task
 //   #/tasks/new?date=2026-11-20  -> same, with the work-session date filled in
+//   #/tasks/new?date=...&start=09:00&end=10:00 -> and its times (planner hours)
 //   #/tasks/<id>/edit            -> form filled from that task, with Delete
 //
 // The page never touches the data directly: it calls the store
@@ -43,7 +44,8 @@ export function render(container, { params, query, from }) {
   const task = editing || {
     title: '', description: '', categoryId: '', taskType: 'Assignment',
     priority: 'medium', status: 'todo', dueDate: '', dueTime: '',
-    scheduledDate: query.get('date') || '', scheduledStartTime: '', scheduledEndTime: '', notes: '',
+    scheduledDate: query.get('date') || '', scheduledStartTime: query.get('start') || '',
+    scheduledEndTime: query.get('end') || '', notes: '',
   };
   document.title = `${editing ? 'Edit task' : 'New task'} · Luma`;
 
