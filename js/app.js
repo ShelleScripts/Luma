@@ -20,11 +20,11 @@ import * as settings from './settings.js';
 import { initTheme, toggleTheme } from './theme.js';
 import { escapeHTML } from './utils.js';
 
-// Which screen belongs to which hash: "#/tasks" -> tasks, "#/tasks/new" -> taskForm
+// Which screen belongs to which hash: "#/tasks" -> tasks.
+// The task form's two routes are handled in findScreen() below.
 const routes = {
   dashboard,
   tasks,
-  'tasks/new': taskForm,
   planner,
   deadlines,
   courses,
@@ -47,32 +47,51 @@ function readHash() {
   };
 }
 
+/**
+ * Works out which screen a hash belongs to, and the params to give it.
+ *   ["tasks", "new"]          -> the task form, no params
+ *   ["tasks", "<id>", "edit"] -> the task form, params [id]
+ *   ["planner", "today"]      -> the planner, params ["today"]
+ * Returns null for an unknown hash.
+ */
+function findScreen(parts) {
+  if (parts[0] === 'tasks' && parts[1] === 'new') {
+    return { screen: taskForm, params: [] };
+  }
+  if (parts[0] === 'tasks' && parts[2] === 'edit') {
+    return { screen: taskForm, params: [parts[1]] };
+  }
+  const screen = routes[parts[0]];
+  return screen ? { screen, params: parts.slice(1) } : null;
+}
+
+/** True for the new-task and edit-task pages. */
+function isFormHash(hash) {
+  return hash.startsWith('#/tasks/new') || hash.endsWith('/edit');
+}
+
 /** Reads the hash and draws that screen. */
 function router() {
   const { parts, query } = readHash();
-
-  // Try the longest match first: "tasks/new" before "tasks"
-  const twoPart = parts.slice(0, 2).join('/');
-  const key = routes[twoPart] ? twoPart : parts[0];
-  const screen = routes[key];
+  const match = findScreen(parts);
 
   // Unknown or missing hash: go to the dashboard. replace() swaps the URL
   // without adding an extra entry to the Back button history.
-  if (!screen) {
+  if (!match) {
     location.replace(`#/${DEFAULT_ROUTE}`);
     return;
   }
 
   // Where "Back" and "Cancel" should go: the last screen, but never a form
-  const from = previousHash && !previousHash.startsWith('#/tasks/new') ? previousHash : '#/tasks';
+  const from = previousHash && !isFormHash(previousHash) ? previousHash : '#/tasks';
 
-  const used = key.split('/').length;
-  screen.render(view, {
-    params: parts.slice(used), // anything after the route, e.g. "today"
-    query,                     // anything after "?", e.g. date=...
+  // Set a default tab title first; a screen may replace it (e.g. "Edit task")
+  document.title = `${match.screen.title} · Luma`;
+  match.screen.render(view, {
+    params: match.params, // e.g. ["today"] or a task id
+    query,                // anything after "?", e.g. date=...
     from: escapeHTML(from),
   });
-  document.title = `${screen.title} · Luma`;
   highlightNav(parts[0]);
   previousHash = location.hash;
 
@@ -114,7 +133,8 @@ function init() {
   // N opens a new task (unless you're typing)
   document.addEventListener('keydown', (event) => {
     const plainKey = !event.ctrlKey && !event.metaKey && !event.altKey;
-    if (event.key.toLowerCase() === 'n' && plainKey && !isTyping(event.target)) {
+    const dialogOpen = document.querySelector('dialog[open]') !== null;
+    if (event.key.toLowerCase() === 'n' && plainKey && !isTyping(event.target) && !dialogOpen) {
       event.preventDefault();
       location.hash = '#/tasks/new';
     }
