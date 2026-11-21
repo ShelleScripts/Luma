@@ -6,7 +6,7 @@ Mockups (reference only, not code to copy): https://claude.ai/artifact/TcztuEyr5
 
 ## 1. Technical decisions (all recommended defaults accepted)
 
-1. **ES modules** (`import` / `export`), run with VS Code Live Server or `python3 -m http.server`. Deploy target: GitHub Pages.
+1. **ES modules** (`import` / `export`), run with VS Code Live Server or `python3 -m http.server`. Deploy target: Vercel (changed from GitHub Pages in Milestone 7), as a plain static site with no build step.
 2. **Dates:** never `new Date("YYYY-MM-DD")`. Use local-date helpers in `utils.js` and compare calendar dates as `YYYY-MM-DD` strings.
 3. **Due date is optional.** Tasks without one show as "No deadline" and are left out of the Deadlines screen.
 4. **An "activity" is a task with scheduled fields.** Planner "Add activity" creates a task. One data type only.
