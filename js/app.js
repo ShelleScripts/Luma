@@ -19,6 +19,8 @@ import * as courses from './courses.js';
 import * as settings from './settings.js';
 import { initTheme, toggleTheme } from './theme.js';
 import { escapeHTML } from './utils.js';
+import { getLoadProblem } from './store.js';
+import { showToast } from './ui.js';
 
 // Which screen belongs to which hash: "#/tasks" -> tasks.
 // The task form's two routes are handled in findScreen() below.
@@ -143,6 +145,13 @@ function init() {
   // Re-route whenever the hash changes (clicking a link, Back, Forward)
   window.addEventListener('hashchange', router);
   router();
+
+  // Tell the user if their saved data couldn't be loaded, or can't be saved
+  const problem = getLoadProblem();
+  if (problem) showToast(problem, { duration: 10000 });
+  document.addEventListener('luma:savefailed', () => {
+    showToast("Couldn't save your last change. Your browser's storage may be full or turned off.", { duration: 10000 });
+  });
 }
 
 init();

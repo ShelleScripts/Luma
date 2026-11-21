@@ -3,12 +3,14 @@
 // (Not in the brief's file list; it gets its own file so every screen
 // follows the same pattern: one module per screen.)
 //
-// Milestone 1: the Theme control works. The other rows say when they
-// arrive: display name in Milestone 3 (it needs saving), week start and
-// the data tools in Milestone 6.
+// Theme (Milestone 1) and display name (Milestone 3) work. The other rows
+// say when they arrive: week start and the data tools in Milestone 6.
 // =============================================================================
 
 import { getThemePref, setThemePref } from './theme.js';
+import { getSettings, updateSettings } from './store.js';
+import { escapeHTML } from './utils.js';
+import { showToast } from './ui.js';
 
 export const title = 'Settings';
 
@@ -29,7 +31,14 @@ export function render(container) {
       <section aria-labelledby="s-you">
         <h2 class="h2 section-title" id="s-you">You</h2>
         <div class="settings-group">
-          ${comingRow('Display name', 'Used in your greeting on the dashboard.', 'Milestone 3')}
+          <form class="settings-row" id="name-form">
+            <label class="settings-row__label" for="display-name"><b>Display name</b><span>Used in your greeting on the dashboard.</span></label>
+            <div class="row-wrap" style="gap:8px">
+              <input id="display-name" class="field" style="width:200px" maxlength="40" autocomplete="given-name"
+                     placeholder="Your name" value="${escapeHTML(getSettings().displayName)}">
+              <button class="btn" type="submit">Save</button>
+            </div>
+          </form>
         </div>
       </section>
 
@@ -55,6 +64,13 @@ export function render(container) {
       </section>
     </div>
   `;
+
+  container.querySelector('#name-form').addEventListener('submit', (event) => {
+    event.preventDefault();
+    const name = container.querySelector('#display-name').value.trim();
+    updateSettings({ displayName: name });
+    showToast(name ? `Saved. Hello, ${name}.` : 'Display name cleared.');
+  });
 
   container.querySelectorAll('[data-theme-pref]').forEach((button) => {
     button.addEventListener('click', () => setThemePref(button.dataset.themePref));

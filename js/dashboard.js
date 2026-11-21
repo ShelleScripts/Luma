@@ -6,7 +6,8 @@
 // numbers calculated from saved tasks.
 // =============================================================================
 
-import { todayISO, formatLongDate, timeOfDay } from './utils.js';
+import { todayISO, formatLongDate, timeOfDay, escapeHTML } from './utils.js';
+import { getSettings } from './store.js';
 import { icons } from './icons.js';
 
 export const title = 'Dashboard';
@@ -30,7 +31,7 @@ export function render(container) {
       <header class="page-header">
         <div class="page-header__text">
           <span class="page-header__eyebrow">${formatLongDate(todayISO())}</span>
-          <h1 class="h1">Good ${timeOfDay()}</h1>
+          <h1 class="h1">Good ${timeOfDay()}${greetingName()}</h1>
         </div>
         <div class="page-header__actions">
           <a class="btn" href="#/planner/today">${icons.calendar()}Plan my day</a>
@@ -99,4 +100,10 @@ function stat(label, value, valueClass = '') {
       <span class="stat__value ${valueClass}">${value}</span>
     </div>
   `;
+}
+
+/** ", Ama" when a display name is set in Settings, otherwise nothing. */
+function greetingName() {
+  const name = getSettings().displayName.trim();
+  return name ? `, ${escapeHTML(name)}` : '';
 }
