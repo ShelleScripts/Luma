@@ -9,9 +9,10 @@
 
 /**
  * Shows a short message at the bottom of the screen for a few seconds.
- * Pass `action` to add a button, e.g. { label: 'Undo', onClick: () => ... }.
+ * Pass `action` to add a button, e.g. { label: 'Undo', onClick: () => ... },
+ * and `duration` (milliseconds) to keep it up longer.
  */
-export function showToast(message, { action } = {}) {
+export function showToast(message, { action, duration } = {}) {
   const region = document.getElementById('toasts');
   const toast = document.createElement('div');
   toast.className = 'toast';
@@ -33,8 +34,9 @@ export function showToast(message, { action } = {}) {
   }
 
   region.append(toast);
-  // Toasts with a button stay a little longer, so there's time to press it
-  setTimeout(() => toast.remove(), action ? 6000 : 4000);
+  // Toasts with a button stay a little longer, so there's time to press it.
+  // Important warnings can ask for longer still with `duration`.
+  setTimeout(() => toast.remove(), duration || (action ? 6000 : 4000));
 }
 
 // ---------------------------------------------------------------------------

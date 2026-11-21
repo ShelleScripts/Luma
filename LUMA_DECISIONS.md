@@ -23,6 +23,7 @@ Mockups (reference only, not code to copy): https://claude.ai/artifact/TcztuEyr5
 15. **All data goes through a small store API from Milestone 2**, so Milestone 3 only swaps in Local Storage.
 16. **Extra files:** `js/ui.js` (toasts now, confirm dialogs from Milestone 2), `js/theme.js` (theme switching), `js/icons.js` (shared SVG icons), `js/task-form.js` (the task page) and `js/settings.js` (one module per screen).
 17. **Routing:** hash routes `#/dashboard`, `#/tasks`, `#/tasks/new`, `#/planner`, `#/deadlines`, `#/courses`, `#/settings`. Anything after `?` is a query (for example `#/tasks/new?date=2026-11-20` pre-fills the work-session date). Unknown routes go to the dashboard.
+18. **Storage (Milestone 3):** all data is saved as one JSON object under the Local Storage key `luma.data`: `{ version: 1, tasks, categories, settings }`. `js/storage.js` reads and writes it; only `store.js` calls it. On load every record is checked: fixable fields are repaired, unusable records are skipped, and the user gets a toast saying how many. Unreadable data is copied to `luma.data.backup` before starting fresh. Changes in one tab update other open tabs. The display name (Settings) is stored in `settings` and shown in the dashboard greeting.
 
 Small UX extras agreed: Today / Tomorrow / Next week date chips, an **N** shortcut for a new task, "Load sample data" in Settings, Undo toast after completing a task, and a mobile bottom tab bar with a floating + button.
 
