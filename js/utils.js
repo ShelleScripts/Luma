@@ -72,6 +72,35 @@ export function timeOfDay(date = new Date()) {
   return 'evening';
 }
 
+/** True for a real calendar date written as "YYYY-MM-DD" (rejects "2026-02-31"). */
+export function isValidISODate(iso) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return false;
+  return toISODate(parseISODate(iso)) === iso;
+}
+
+/** Whole days from one "YYYY-MM-DD" to another: daysBetween(today, tomorrow) = 1. */
+export function daysBetween(fromISO, toISO) {
+  const ms = parseISODate(toISO) - parseISODate(fromISO);
+  return Math.round(ms / 86400000); // Math.round copes with daylight-saving hours
+}
+
+/** "18 Nov, 21:40" from an ISO timestamp like "2026-11-18T21:40:00.000Z" (shown in local time). */
+export function formatTimestamp(isoTimestamp) {
+  const date = new Date(isoTimestamp);
+  const day = date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  return `${day}, ${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+}
+
+/**
+ * A unique id for a new record. crypto.randomUUID() is built into modern
+ * browsers but only on secure pages (https or localhost), so there's a
+ * fallback for e.g. testing on your phone over your home network.
+ */
+export function makeId() {
+  if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  return `id-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 /**
  * Makes text safe to put inside HTML. Anything a user types (a task title,
  * a course name) must go through this before it goes into innerHTML,

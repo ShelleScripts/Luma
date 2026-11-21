@@ -1,58 +1,74 @@
 // =============================================================================
-// task-form.js — the New task page (#/tasks/new).
+// task-form.js — the task page, for both a new task and editing one.
 //
-// In the new design the task form is its own page rather than a pop-up.
-// Milestone 1: every control works and the form is validated, but Save
-// doesn't store anything yet. Milestone 2 turns the form into a task object
-// and saves it (and reuses this page for "Edit task").
+//   #/tasks/new                  -> empty form, "Save task" creates a task
+//   #/tasks/new?date=2026-11-20  -> same, with the work-session date filled in
+//   #/tasks/<id>/edit            -> form filled from that task, with Delete
 //
-// Links can pre-fill the work-session date: #/tasks/new?date=2026-11-20
-// (the Planner's "Add activity" does this).
+// The page never touches the data directly: it calls the store
+// (addTask / updateTask / deleteTask).
 // =============================================================================
 
-import { todayISO, addDays } from './utils.js';
+import { todayISO, addDays, escapeHTML, isValidISODate, formatTimestamp } from './utils.js';
 import { icons } from './icons.js';
-import { showToast } from './ui.js';
+import { showToast, confirmDialog } from './ui.js';
+import {
+  TASK_TYPES, PRIORITIES, PRIORITY_LABELS, STATUSES, STATUS_LABELS,
+  getTask, getCategories, addTask, updateTask, deleteTask,
+} from './store.js';
 
-export const title = 'New task';
+export const title = 'Task';
 
-const PRIORITIES = [
-  { value: 'low', name: 'Low', color: 'var(--text-3)' },
-  { value: 'medium', name: 'Medium', color: 'var(--c-blue)' },
-  { value: 'high', name: 'High', color: 'var(--amber)' },
-  { value: 'urgent', name: 'Urgent', color: 'var(--red)' },
-];
+const PRIORITY_COLORS = { low: 'var(--text-3)', medium: 'var(--c-blue)', high: 'var(--amber)', urgent: 'var(--red)' };
 
-const STATUSES = [
-  { value: 'todo', name: 'To do' },
-  { value: 'in-progress', name: 'In progress' },
-  { value: 'completed', name: 'Completed' },
-];
+/**
+ * Draws the page. For an edit, params[0] is the task's id.
+ */
+export function render(container, { params, query, from }) {
+  const editing = params[0] ? getTask(params[0]) : null;
 
-const TYPES = ['Assignment', 'Quiz', 'Examination', 'Reading', 'Project', 'Study Session', 'Personal', 'Other'];
-const CATEGORIES = ['Academic', 'Personal', 'Extracurricular', 'Work', 'Projects'];
+  // An edit link to a task that no longer exists (deleted, or a typo)
+  if (params[0] && !editing) {
+    container.innerHTML = `
+      <div class="page page--form">
+        <h1 class="h1">Task not found</h1>
+        <p class="muted">It may have been deleted.</p>
+        <p><a class="btn" href="#/tasks">Go to My Tasks</a></p>
+      </div>
+    `;
+    return;
+  }
 
-export function render(container, { query, from }) {
-  const scheduledDate = query.get('date') || '';
+  // The values to show: the task being edited, or defaults for a new one
+  const task = editing || {
+    title: '', description: '', categoryId: '', taskType: 'Assignment',
+    priority: 'medium', status: 'todo', dueDate: '', dueTime: '',
+    scheduledDate: query.get('date') || '', scheduledStartTime: '', scheduledEndTime: '', notes: '',
+  };
+  document.title = `${editing ? 'Edit task' : 'New task'} · Luma`;
+
+  // escapeHTML on everything the user typed, because it goes into innerHTML
+  const v = (field) => escapeHTML(task[field] ?? '');
 
   container.innerHTML = `
     <div class="page page--form">
       <div>
         <a href="${from}" class="back-link">${icons.chevronLeft()}Back</a>
-        <h1 class="h1">New task</h1>
+        <h1 class="h1">${editing ? 'Edit task' : 'New task'}</h1>
+        ${editing ? `<p class="muted num form-meta">Created ${formatTimestamp(task.createdAt)} · Last updated ${formatTimestamp(task.updatedAt)}</p>` : ''}
       </div>
 
       <form class="form" id="task-form" novalidate>
         <div class="f">
           <label class="f__label" for="task-title">Title</label>
           <input id="task-title" name="title" class="field field--title" autocomplete="off"
-                 aria-describedby="title-error" required>
-          <span id="title-error" class="err" hidden>Give the task a title so you can find it later.</span>
+                 maxlength="200" value="${v('title')}" aria-describedby="title-error" required>
+          <span id="title-error" class="err" hidden></span>
         </div>
 
         <div class="f">
           <label class="f__label" for="task-description">Description <span class="f__optional">(optional)</span></label>
-          <textarea id="task-description" name="description" class="field" rows="3"></textarea>
+          <textarea id="task-description" name="description" class="field" rows="3">${v('description')}</textarea>
         </div>
 
         <div class="grid-2">
@@ -60,13 +76,14 @@ export function render(container, { query, from }) {
             <label class="f__label" for="task-category">Course or category</label>
             <select id="task-category" name="categoryId" class="field">
               <option value="">Uncategorized</option>
-              ${CATEGORIES.map((c) => `<option value="${c.toLowerCase()}">${c}</option>`).join('')}
+              ${getCategories().map((c) => `
+                <option value="${c.id}" ${c.id === task.categoryId ? 'selected' : ''}>${escapeHTML(c.name)}</option>`).join('')}
             </select>
           </div>
           <div class="f">
             <label class="f__label" for="task-type">Type</label>
             <select id="task-type" name="taskType" class="field">
-              ${TYPES.map((t) => `<option>${t}</option>`).join('')}
+              ${TASK_TYPES.map((t) => `<option ${t === task.taskType ? 'selected' : ''}>${t}</option>`).join('')}
             </select>
           </div>
         </div>
@@ -76,8 +93,8 @@ export function render(container, { query, from }) {
             <span class="f__label" id="prio-label">Priority</span>
             <div class="seg" role="group" aria-labelledby="prio-label">
               ${PRIORITIES.map((p) => `
-                <button type="button" data-priority="${p.value}" aria-pressed="${p.value === 'medium'}">
-                  <span class="dot dot--small" style="background:${p.color}"></span>${p.name}
+                <button type="button" data-priority="${p}" aria-pressed="${p === task.priority}">
+                  <span class="dot dot--small" style="background:${PRIORITY_COLORS[p]}"></span>${PRIORITY_LABELS[p]}
                 </button>`).join('')}
             </div>
           </div>
@@ -85,7 +102,7 @@ export function render(container, { query, from }) {
             <span class="f__label" id="status-label">Status</span>
             <div class="seg" role="group" aria-labelledby="status-label">
               ${STATUSES.map((s) => `
-                <button type="button" data-status="${s.value}" aria-pressed="${s.value === 'todo'}">${s.name}</button>`).join('')}
+                <button type="button" data-status="${s}" aria-pressed="${s === task.status}">${STATUS_LABELS[s]}</button>`).join('')}
             </div>
           </div>
         </div>
@@ -102,13 +119,14 @@ export function render(container, { query, from }) {
             <div class="grid-2">
               <div class="f">
                 <label class="f__label" for="task-due-date">Due date</label>
-                <input id="task-due-date" name="dueDate" type="date" class="field num">
+                <input id="task-due-date" name="dueDate" type="date" class="field num" value="${v('dueDate')}" aria-describedby="due-error">
               </div>
               <div class="f">
                 <label class="f__label" for="task-due-time">Due time</label>
-                <input id="task-due-time" name="dueTime" type="time" class="field num">
+                <input id="task-due-time" name="dueTime" type="time" class="field num" value="${v('dueTime')}">
               </div>
             </div>
+            <span id="due-error" class="err" hidden></span>
           </fieldset>
 
           <fieldset class="card box">
@@ -116,16 +134,16 @@ export function render(container, { query, from }) {
             <p class="box__hint">When you plan to work on it. Shows in your planner.</p>
             <div class="f">
               <label class="f__label" for="task-sched-date">Date</label>
-              <input id="task-sched-date" name="scheduledDate" type="date" class="field num" value="${scheduledDate}">
+              <input id="task-sched-date" name="scheduledDate" type="date" class="field num" value="${v('scheduledDate')}">
             </div>
             <div class="grid-2">
               <div class="f">
                 <label class="f__label" for="task-start">Start</label>
-                <input id="task-start" name="scheduledStartTime" type="time" class="field num">
+                <input id="task-start" name="scheduledStartTime" type="time" class="field num" value="${v('scheduledStartTime')}">
               </div>
               <div class="f">
                 <label class="f__label" for="task-end">End</label>
-                <input id="task-end" name="scheduledEndTime" type="time" class="field num" aria-describedby="time-error">
+                <input id="task-end" name="scheduledEndTime" type="time" class="field num" value="${v('scheduledEndTime')}" aria-describedby="time-error">
               </div>
             </div>
             <span id="time-error" class="err" hidden></span>
@@ -134,13 +152,14 @@ export function render(container, { query, from }) {
 
         <div class="f">
           <label class="f__label" for="task-notes">Notes <span class="f__optional">(optional)</span></label>
-          <textarea id="task-notes" name="notes" class="field" rows="3"></textarea>
+          <textarea id="task-notes" name="notes" class="field" rows="3">${v('notes')}</textarea>
         </div>
 
-        <input type="hidden" name="priority" value="medium">
-        <input type="hidden" name="status" value="todo">
+        <input type="hidden" name="priority" value="${v('priority')}">
+        <input type="hidden" name="status" value="${v('status')}">
 
         <div class="form-actions">
+          ${editing ? `<button type="button" class="btn btn--ghost-danger" data-delete>${icons.trash()}Delete task</button>` : ''}
           <a class="btn" href="${from}">Cancel</a>
           <button class="btn btn--primary" type="submit">Save task</button>
         </div>
@@ -148,24 +167,24 @@ export function render(container, { query, from }) {
     </div>
   `;
 
-  connect(container.querySelector('#task-form'), from);
+  connect(container.querySelector('#task-form'), editing, from);
 }
 
-/** Wires up the form's buttons and validation. */
-function connect(form, from) {
+/** Wires up the form's buttons, validation and saving. */
+function connect(form, editing, from) {
   // Segmented controls: one button pressed at a time, value kept in a hidden input
-  const pickOne = (attr, field) => {
+  const pickOne = (attr) => {
     form.querySelectorAll(`[data-${attr}]`).forEach((button) => {
       button.addEventListener('click', () => {
-        form.elements[field].value = button.dataset[attr];
+        form.elements[attr].value = button.dataset[attr];
         form.querySelectorAll(`[data-${attr}]`).forEach((b) => {
           b.setAttribute('aria-pressed', String(b === button));
         });
       });
     });
   };
-  pickOne('priority', 'priority');
-  pickOne('status', 'status');
+  pickOne('priority');
+  pickOne('status');
 
   // Today / Tomorrow / Next week fill in the due date
   form.querySelectorAll('[data-due]').forEach((button) => {
@@ -180,10 +199,53 @@ function connect(form, from) {
       form.querySelector('[aria-invalid="true"]').focus();
       return;
     }
-    // Milestone 2 replaces this with: build a task object and save it.
-    showToast('Form looks good. Saving tasks arrives in Milestone 2.');
+
+    const fields = readForm(form);
+    if (editing) {
+      updateTask(editing.id, fields);
+      showToast('Task updated.');
+    } else {
+      addTask(fields);
+      showToast('Task added.');
+    }
     location.hash = from;
   });
+
+  const deleteButton = form.querySelector('[data-delete]');
+  if (deleteButton) {
+    deleteButton.addEventListener('click', async () => {
+      const ok = await confirmDialog({
+        title: 'Delete this task?',
+        message: `"${editing.title}" will be removed from every view. You can't undo this.`,
+        confirmLabel: 'Delete task',
+        cancelLabel: 'Keep task',
+        danger: true,
+      });
+      if (!ok) return;
+      deleteTask(editing.id);
+      showToast('Task deleted.');
+      location.hash = '#/tasks';
+    });
+  }
+}
+
+/** Collects the form's values into a plain object, ready for the store. */
+function readForm(form) {
+  const get = (name) => form.elements[name].value.trim();
+  return {
+    title: get('title'),
+    description: get('description'),
+    categoryId: get('categoryId'),
+    taskType: get('taskType'),
+    priority: get('priority'),
+    status: get('status'),
+    dueDate: get('dueDate'),
+    dueTime: get('dueTime'),
+    scheduledDate: get('scheduledDate'),
+    scheduledStartTime: get('scheduledStartTime'),
+    scheduledEndTime: get('scheduledEndTime'),
+    notes: get('notes'),
+  };
 }
 
 /** Shows or hides one field's error. */
@@ -199,22 +261,36 @@ function setError(input, errorEl, message) {
 }
 
 /**
- * Checks the form. Returns true when everything is valid.
- * Rules from the brief: the title is required, and a scheduled end time
- * must be later than its start time.
+ * Checks the form and shows any problems. Returns true when it's valid.
+ * Rules from the brief: the title is required, dates must be real dates,
+ * and a work session's end time must be later than its start time.
  */
 function validate(form) {
-  const { title, scheduledDate, scheduledStartTime, scheduledEndTime } = form.elements;
-  const titleError = form.querySelector('#title-error');
-  const timeError = form.querySelector('#time-error');
+  const el = form.elements;
+  const errors = [];
 
-  const titleOk = title.value.trim() !== '';
-  setError(title, titleError, titleOk ? '' : titleError.textContent);
+  // Title
+  const titleMessage = el.title.value.trim() === '' ? 'Give the task a title so you can find it later.' : '';
+  setError(el.title, form.querySelector('#title-error'), titleMessage);
+  errors.push(titleMessage);
 
-  const start = scheduledStartTime.value;
-  const end = scheduledEndTime.value;
+  // Deadline
+  let dueMessage = '';
+  if (el.dueDate.value && !isValidISODate(el.dueDate.value)) {
+    dueMessage = "That due date isn't a real date.";
+  } else if (el.dueTime.value && !el.dueDate.value) {
+    dueMessage = 'Add a due date for this time, or clear the time.';
+  }
+  setError(el.dueDate, form.querySelector('#due-error'), dueMessage);
+  errors.push(dueMessage);
+
+  // Work session
+  const start = el.scheduledStartTime.value;
+  const end = el.scheduledEndTime.value;
   let timeMessage = '';
-  if ((start || end) && !scheduledDate.value) {
+  if (el.scheduledDate.value && !isValidISODate(el.scheduledDate.value)) {
+    timeMessage = "That work-session date isn't a real date.";
+  } else if ((start || end) && !el.scheduledDate.value) {
     timeMessage = 'Pick a date for the work session.';
   } else if (end && !start) {
     timeMessage = 'Add a start time too.';
@@ -222,7 +298,8 @@ function validate(form) {
     // "HH:MM" strings compare correctly as text: "15:00" < "16:00"
     timeMessage = 'The end time needs to be later than the start time.';
   }
-  setError(scheduledEndTime, timeError, timeMessage);
+  setError(el.scheduledEndTime, form.querySelector('#time-error'), timeMessage);
+  errors.push(timeMessage);
 
-  return titleOk && !timeMessage;
+  return errors.every((message) => message === '');
 }
