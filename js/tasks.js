@@ -1,20 +1,24 @@
 // =============================================================================
 // tasks.js — the My Tasks screen.
 //
-// Milestone 2: lists every task with its checkbox, course, priority, due
-// date and status, plus Edit and Delete. The view tabs (All / Today /
-// Upcoming / Completed) filter the list. Search, filters and sorting
-// choices arrive in Milestone 5; for now the list is sorted by due date.
+// Lists every task with its checkbox, course, priority, due date and status,
+// plus Edit and Delete. The view tabs (All / Today / Upcoming / Completed),
+// the search box, the three filters and the sort all work TOGETHER: a task
+// is shown only if it passes every one of them.
+//
+// #/tasks?category=<id> opens the list filtered to one course or category
+// (the Courses screen links here).
 // =============================================================================
 
 import { icons } from './icons.js';
 import { escapeHTML } from './utils.js';
-import { showToast, confirmDialog } from './ui.js';
 import {
-  getTasks, getCategory, setCompleted, restoreTask, deleteTask,
-  PRIORITY_LABELS, STATUS_LABELS,
+  getTasks, getCategories, PRIORITIES, PRIORITY_LABELS, STATUSES, STATUS_LABELS,
 } from './store.js';
-import { isDone, isToday, isUpcoming, isOverdue, dueLabel, compareByDue } from './task-helpers.js';
+import {
+  isDone, isToday, isUpcoming, compareByDue, compareByPriority, compareByNewest,
+} from './task-helpers.js';
+import { taskRow, connectTaskActions, refocus, focusedTaskId } from './task-list.js';
 
 export const title = 'My Tasks';
 
@@ -32,147 +36,217 @@ const EMPTY_MESSAGES = {
   completed: 'Completed tasks will show up here.',
 };
 
-// Remembered while you move around the app
-let currentView = 'all';
+const SORTS = [
+  { id: 'due', name: 'Due date', compare: compareByDue },
+  { id: 'priority', name: 'Priority', compare: compareByPriority },
+  { id: 'newest', name: 'Newest first', compare: compareByNewest },
+];
+
+// Your choices, remembered while you move around the app
+const state = {
+  view: 'all',
+  search: '',
+  status: '',    // '' means any
+  priority: '',
+  category: '',  // '' any, 'none' Uncategorized, or a category id
+  sort: 'due',
+};
 
 // The element this screen is drawn into, so we can redraw it when data changes
 let mounted = null;
 
-export function render(container) {
+/** True when any search or filter is narrowing the list. */
+const isFiltering = () => Boolean(state.search || state.status || state.priority || state.category);
+
+/** Does a task pass the search box and the three filters? */
+function passesFilters(task) {
+  if (state.search && !task.title.toLowerCase().includes(state.search.toLowerCase())) return false;
+  if (state.status && task.status !== state.status) return false;
+  if (state.priority && task.priority !== state.priority) return false;
+  if (state.category === 'none' && task.categoryId) return false;
+  if (state.category && state.category !== 'none' && task.categoryId !== state.category) return false;
+  return true;
+}
+
+export function render(container, { query } = {}) {
   mounted = container;
-  const all = getTasks();
-  const view = VIEWS.find((v) => v.id === currentView);
-  const shown = all.filter(view.test).sort(compareByDue);
+
+  // A link like #/tasks?category=abc shows just that course or category
+  const fromLink = query?.get('category');
+  if (fromLink) {
+    Object.assign(state, { view: 'all', search: '', status: '', priority: '', category: fromLink });
+    // Tidy the address back to #/tasks (replaceState doesn't re-run the
+    // router), so coming back later doesn't re-apply this filter
+    history.replaceState(null, '', '#/tasks');
+  }
+
+  // Forget a filter for a course that has since been deleted
+  const categories = getCategories();
+  if (state.category && state.category !== 'none' && !categories.some((c) => c.id === state.category)) {
+    state.category = '';
+  }
+  const courses = categories.filter((c) => c.kind === 'course');
+  const general = categories.filter((c) => c.kind !== 'course');
+  const option = (value, label, current) =>
+    `<option value="${escapeHTML(value)}" ${value === current ? 'selected' : ''}>${label}</option>`;
 
   container.innerHTML = `
     <div class="page" style="gap:20px" data-screen="tasks">
       <header class="page-header" style="align-items:center">
         <div style="flex:1">
           <h1 class="h1" tabindex="-1">My Tasks</h1>
-          <p class="muted num" style="margin-top:4px">${all.filter((t) => !isDone(t)).length} open · ${all.filter(isDone).length} done</p>
+          <p class="muted num" style="margin-top:4px" id="task-summary"></p>
         </div>
         <a class="btn btn--primary" href="#/tasks/new">${icons.plus()}Add task</a>
       </header>
 
+      <div class="toolbar" role="search">
+        <label class="toolbar__search">
+          <span class="visually-hidden">Search tasks by title</span>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></svg>
+          <input type="search" class="field" id="task-search" placeholder="Search by title" autocomplete="off" value="${escapeHTML(state.search)}">
+        </label>
+        <label class="toolbar__filter">
+          <span class="visually-hidden">Status</span>
+          <select class="field" data-filter="status">
+            ${option('', 'Any status', state.status)}
+            ${STATUSES.map((s) => option(s, STATUS_LABELS[s], state.status)).join('')}
+          </select>
+        </label>
+        <label class="toolbar__filter">
+          <span class="visually-hidden">Priority</span>
+          <select class="field" data-filter="priority">
+            ${option('', 'Any priority', state.priority)}
+            ${PRIORITIES.map((p) => option(p, PRIORITY_LABELS[p], state.priority)).join('')}
+          </select>
+        </label>
+        <label class="toolbar__filter">
+          <span class="visually-hidden">Course or category</span>
+          <select class="field" data-filter="category">
+            ${option('', 'All courses and categories', state.category)}
+            ${courses.length ? `<optgroup label="Courses">${courses.map((c) => option(c.id, escapeHTML(c.name), state.category)).join('')}</optgroup>` : ''}
+            <optgroup label="Categories">
+              ${general.map((c) => option(c.id, escapeHTML(c.name), state.category)).join('')}
+              ${option('none', 'Uncategorized', state.category)}
+            </optgroup>
+          </select>
+        </label>
+        <label class="toolbar__filter">
+          <span class="visually-hidden">Sort by</span>
+          <select class="field" data-filter="sort">
+            ${SORTS.map((s) => option(s.id, `Sort: ${s.name}`, state.sort)).join('')}
+          </select>
+        </label>
+        <button type="button" class="btn btn--small" data-clear ${isFiltering() ? '' : 'hidden'}>Clear filters</button>
+      </div>
+
       <div class="tabs" role="tablist" aria-label="Task views">
         ${VIEWS.map((v) => `
           <button type="button" class="tab" role="tab" data-view="${v.id}"
-                  aria-selected="${v.id === currentView}">${v.name}<span class="num muted">${all.filter(v.test).length}</span></button>
+                  aria-selected="${v.id === state.view}">${v.name}<span class="num muted" data-count="${v.id}"></span></button>
         `).join('')}
       </div>
 
-      <ul class="list" role="tabpanel" aria-label="${view.name} tasks">
-        ${shown.length ? shown.map(taskRow).join('') : emptyState()}
-      </ul>
+      <ul class="list" role="tabpanel" id="task-list"></ul>
     </div>
   `;
 
+  drawList(container);
   connect(container);
 }
 
-/** The HTML for one task. Everything the user typed goes through escapeHTML. */
-function taskRow(task) {
-  const done = isDone(task);
-  const name = escapeHTML(task.title);
-  const category = getCategory(task.categoryId);
-  const overdue = isOverdue(task);
+/**
+ * Redraws only the counts and the list, not the search box, so typing
+ * doesn't lose your place in the box.
+ */
+function drawList(container) {
+  const all = getTasks();
+  const filtered = all.filter(passesFilters);
+  const view = VIEWS.find((v) => v.id === state.view);
+  const sort = SORTS.find((s) => s.id === state.sort);
+  const shown = filtered.filter(view.test).sort(sort.compare);
 
-  let dueClass = '';
-  if (overdue) dueClass = 'task-row__due--overdue';
-  else if (!task.dueDate) dueClass = 'task-row__due--none';
+  const open = all.filter((t) => !isDone(t)).length;
+  container.querySelector('#task-summary').textContent = isFiltering()
+    ? `${filtered.length} of ${all.length} tasks match`
+    : `${open} open · ${all.length - open} done`;
 
-  return `
-    <li class="task-row ${done ? 'task-row--done' : ''}" data-id="${task.id}">
-      <button type="button" class="checkbox" role="checkbox" aria-checked="${done}"
-              aria-label="Completed: ${name}" data-toggle>${done ? icons.tick() : ''}</button>
-      <a class="task-row__main" href="#/tasks/${task.id}/edit">
-        <span class="task-row__title">${name}</span>
-        <span class="task-row__type">${escapeHTML(task.taskType)}</span>
-      </a>
-      <span class="chip task-row__course">
-        <span class="dot" style="background:${category ? category.color : 'var(--c-grey)'}"></span>
-        <span>${category ? escapeHTML(category.name) : 'Uncategorized'}</span>
-      </span>
-      <span class="priority">${icons.priority(task.priority)}${PRIORITY_LABELS[task.priority]}</span>
-      <span class="task-row__due ${dueClass}">${overdue ? 'Overdue · ' : ''}${dueLabel(task)}</span>
-      <span class="task-row__status"><span class="status status--${task.status}">${STATUS_LABELS[task.status]}</span></span>
-      <span class="task-row__actions">
-        <a class="icon-btn" href="#/tasks/${task.id}/edit" aria-label="Edit ${name}">${icons.pencil()}</a>
-        <button type="button" class="icon-btn" aria-label="Delete ${name}" data-delete>${icons.trash()}</button>
-      </span>
-    </li>
-  `;
+  // The tab counts follow the search and filters too
+  VIEWS.forEach((v) => {
+    container.querySelector(`[data-count="${v.id}"]`).textContent = filtered.filter(v.test).length;
+  });
+  container.querySelectorAll('[data-view]').forEach((tab) => {
+    tab.setAttribute('aria-selected', String(tab.dataset.view === state.view));
+  });
+  container.querySelector('[data-clear]').hidden = !isFiltering();
+
+  const list = container.querySelector('#task-list');
+  list.setAttribute('aria-label', `${view.name} tasks`);
+  list.innerHTML = shown.length ? shown.map(taskRow).join('') : emptyState(all.length);
 }
 
-function emptyState() {
+function emptyState(taskCount) {
+  // Tasks exist, but the search or filters hide them all
+  if (taskCount > 0 && isFiltering()) {
+    return `
+      <li class="empty">
+        <span>${icons.check(32)}</span>
+        <p>No tasks match your search and filters.</p>
+        <button type="button" class="btn" data-clear>Clear filters</button>
+      </li>
+    `;
+  }
   return `
     <li class="empty">
       <span>${icons.check(32)}</span>
-      <p>${EMPTY_MESSAGES[currentView]}</p>
+      <p>${EMPTY_MESSAGES[state.view]}</p>
       <a class="btn" href="#/tasks/new">Add task</a>
       <p class="small">Tip: press <kbd>N</kbd> anywhere to add a task.</p>
     </li>
   `;
 }
 
-/** Wires up the tabs and each row's buttons. */
+/** Wires up the search, filters, tabs and the list's buttons. */
 function connect(container) {
-  container.querySelectorAll('[data-view]').forEach((tab) => {
-    tab.addEventListener('click', () => {
-      currentView = tab.dataset.view;
-      render(container);
-      container.querySelector(`[data-view="${currentView}"]`).focus();
+  // "input" fires on every keystroke, so results update as you type
+  container.querySelector('#task-search').addEventListener('input', (event) => {
+    state.search = event.target.value.trim();
+    drawList(container);
+  });
+
+  // "change" fires when you pick a different option in a dropdown
+  container.querySelectorAll('[data-filter]').forEach((select) => {
+    select.addEventListener('change', () => {
+      state[select.dataset.filter] = select.value;
+      drawList(container);
     });
   });
 
-  // One listener on the list handles every row ("event delegation")
-  container.querySelector('.list').addEventListener('click', async (event) => {
-    const row = event.target.closest('[data-id]');
-    if (!row) return;
-    const id = row.dataset.id;
-
-    if (event.target.closest('[data-toggle]')) {
-      const nowDone = row.querySelector('[data-toggle]').getAttribute('aria-checked') !== 'true';
-      const before = setCompleted(id, nowDone); // the store redraws this screen
-      refocus(container, id, '[data-toggle]');
-      showToast(nowDone ? 'Task completed.' : 'Task reopened.', {
-        action: { label: 'Undo', onClick: () => restoreTask(before) },
-      });
-    }
-
-    if (event.target.closest('[data-delete]')) {
-      const task = getTasks().find((t) => t.id === id);
-      const ok = await confirmDialog({
-        title: 'Delete this task?',
-        message: `"${task.title}" will be removed from every view. You can't undo this.`,
-        confirmLabel: 'Delete task',
-        cancelLabel: 'Keep task',
-        danger: true,
-      });
-      if (!ok) return;
-      deleteTask(id);
-      showToast('Task deleted.');
-      container.querySelector('h1').focus();
-    }
+  container.querySelectorAll('[data-view]').forEach((tab) => {
+    tab.addEventListener('click', () => {
+      state.view = tab.dataset.view;
+      drawList(container);
+    });
   });
+
+  // Both "Clear filters" buttons (toolbar and empty state). The listener goes
+  // on this screen's page element, not on #view which every screen shares.
+  container.querySelector('[data-screen]').addEventListener('click', (event) => {
+    if (!event.target.closest('[data-clear]')) return;
+    Object.assign(state, { search: '', status: '', priority: '', category: '' });
+    render(container);
+    container.querySelector('#task-search').focus();
+  });
+
+  connectTaskActions(container.querySelector('#task-list'), container);
 }
 
-/**
- * After a redraw the old buttons are gone, so put keyboard focus back on the
- * same button in the new row (if the task is still in this view).
- */
-function refocus(container, id, selector) {
-  const row = container.querySelector(`[data-id="${CSS.escape(id)}"]`);
-  const target = row ? row.querySelector(selector) : container.querySelector('h1');
-  if (target) target.focus();
-}
-
-// When the store says the data changed (complete, undo, delete), redraw this
-// screen, but only if it's still the one on screen.
+// When the store says the data changed (complete, undo, delete), redraw the
+// list, but only if this screen is still the one on show.
 document.addEventListener('luma:datachange', () => {
   if (mounted && mounted.querySelector('[data-screen="tasks"]')) {
-    const focusedId = document.activeElement?.closest('[data-id]')?.dataset.id;
-    render(mounted);
-    if (focusedId) refocus(mounted, focusedId, '[data-toggle]');
+    const focusedId = focusedTaskId(mounted);
+    drawList(mounted);
+    if (focusedId) refocus(mounted, focusedId);
   }
 });

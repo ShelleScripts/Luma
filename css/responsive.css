@@ -84,6 +84,24 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .today-row__course {
+    display: none;
+  }
+
+  /* Filters: two per row under a full-width search box */
+  .toolbar__search {
+    flex-basis: 100%;
+  }
+
+  .toolbar__filter {
+    flex: 1 1 calc(50% - 4px);
+  }
+
+  .toolbar__filter .field {
+    width: 100%;
+    max-width: none;
+  }
+
   .toasts {
     bottom: calc(140px + env(safe-area-inset-bottom));
   }

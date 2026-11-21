@@ -37,6 +37,18 @@ const DEFAULT_CATEGORIES = [
   { id: 'projects', kind: 'general', name: 'Projects', color: 'var(--green)' },
 ];
 
+// The colours a course can have (CSS variables from style.css)
+export const COURSE_COLORS = [
+  { value: 'var(--c-blue)', name: 'Blue' },
+  { value: 'var(--c-purple)', name: 'Purple' },
+  { value: 'var(--c-teal)', name: 'Teal' },
+  { value: 'var(--c-orange)', name: 'Orange' },
+  { value: 'var(--c-pink)', name: 'Pink' },
+  { value: 'var(--c-sky)', name: 'Sky' },
+  { value: 'var(--c-grey)', name: 'Grey' },
+];
+const COLOR_VALUES = COURSE_COLORS.map((c) => c.value);
+
 const DEFAULT_SETTINGS = { displayName: '' };
 
 // ---------------------------------------------------------------------------
@@ -170,7 +182,14 @@ function cleanCategories(list) {
   for (const c of list) {
     if (c && c.kind === 'course' && isText(c.id) && c.id && !ids.has(c.id) && isText(c.name) && c.name.trim()) {
       ids.add(c.id);
-      courses.push({ ...c });
+      courses.push({
+        id: c.id,
+        kind: 'course',
+        name: c.name,
+        code: isText(c.code) ? c.code : '',
+        description: isText(c.description) ? c.description : '',
+        color: COLOR_VALUES.includes(c.color) ? c.color : 'var(--c-grey)',
+      });
     }
   }
   return [...general, ...courses];
@@ -200,7 +219,7 @@ export function updateSettings(changes) {
 }
 
 // ---------------------------------------------------------------------------
-// Tasks
+// Reading tasks and categories
 // ---------------------------------------------------------------------------
 
 /**
@@ -230,6 +249,75 @@ export function getCategory(id) {
   const category = categories.find((c) => c.id === id);
   return category ? { ...category } : null;
 }
+
+// ---------------------------------------------------------------------------
+// Courses (categories with kind: "course")
+// ---------------------------------------------------------------------------
+
+/** Just the courses, in the order they were added. */
+export function getCourses() {
+  return categories.filter((c) => c.kind === 'course').map((c) => ({ ...c }));
+}
+
+/** Only the fields a course may have, trimmed. */
+function courseFields(fields) {
+  const result = {};
+  if (isText(fields.name)) result.name = fields.name.trim();
+  if (isText(fields.code)) result.code = fields.code.trim();
+  if (isText(fields.description)) result.description = fields.description.trim();
+  if (COLOR_VALUES.includes(fields.color)) result.color = fields.color;
+  return result;
+}
+
+/** Adds a course: { name, code, description, color }. Returns it. */
+export function addCourse(fields) {
+  const course = {
+    id: makeId(),
+    kind: 'course',
+    name: '',
+    code: '',
+    description: '',
+    color: COURSE_COLORS[0].value,
+    ...courseFields(fields),
+  };
+  categories.push(course);
+  announceChange();
+  return { ...course };
+}
+
+/** Changes a course's details. Returns the updated course, or null. */
+export function updateCourse(id, changes) {
+  const course = categories.find((c) => c.id === id && c.kind === 'course');
+  if (!course) return null;
+  Object.assign(course, courseFields(changes));
+  announceChange();
+  return { ...course };
+}
+
+/**
+ * Deletes a course (decision 7). Its tasks are KEPT and become
+ * Uncategorized. Returns how many tasks were moved.
+ */
+export function deleteCourse(id) {
+  const before = categories.length;
+  categories = categories.filter((c) => !(c.id === id && c.kind === 'course'));
+  if (categories.length === before) return 0;
+  const now = new Date().toISOString();
+  let moved = 0;
+  tasks.forEach((task) => {
+    if (task.categoryId === id) {
+      task.categoryId = '';
+      task.updatedAt = now;
+      moved++;
+    }
+  });
+  announceChange();
+  return moved;
+}
+
+// ---------------------------------------------------------------------------
+// Tasks
+// ---------------------------------------------------------------------------
 
 /**
  * Creates a task from the form's fields and returns it.

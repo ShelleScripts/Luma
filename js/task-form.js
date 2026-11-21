@@ -78,8 +78,7 @@ export function render(container, { params, query, from }) {
             <label class="f__label" for="task-category">Course or category</label>
             <select id="task-category" name="categoryId" class="field">
               <option value="">Uncategorized</option>
-              ${getCategories().map((c) => `
-                <option value="${c.id}" ${c.id === task.categoryId ? 'selected' : ''}>${escapeHTML(c.name)}</option>`).join('')}
+              ${categoryOptions(task.categoryId)}
             </select>
           </div>
           <div class="f">
@@ -170,6 +169,21 @@ export function render(container, { params, query, from }) {
   `;
 
   connect(container.querySelector('#task-form'), editing, from);
+}
+
+/**
+ * The <option>s for the category dropdown: courses first, then the general
+ * categories, each in its own <optgroup> (a labelled group in the list).
+ */
+function categoryOptions(selectedId) {
+  const option = (c) => `<option value="${c.id}" ${c.id === selectedId ? 'selected' : ''}>${escapeHTML(c.name)}</option>`;
+  const all = getCategories();
+  const courses = all.filter((c) => c.kind === 'course');
+  const general = all.filter((c) => c.kind !== 'course');
+  return `
+    ${courses.length ? `<optgroup label="Courses">${courses.map(option).join('')}</optgroup>` : ''}
+    <optgroup label="Categories">${general.map(option).join('')}</optgroup>
+  `;
 }
 
 /** Wires up the form's buttons, validation and saving. */
