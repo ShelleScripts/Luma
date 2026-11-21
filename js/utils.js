@@ -35,11 +35,14 @@ export function addDays(iso, days) {
   return toISODate(date);
 }
 
-/** The Monday of the week that contains this date. */
-export function startOfWeek(iso) {
-  const date = parseISODate(iso);
-  const day = date.getDay();          // 0 = Sunday, 1 = Monday ... 6 = Saturday
-  const back = (day + 6) % 7;         // how many days since Monday
+/**
+ * The first day of the week that contains this date: its Monday, or its
+ * Sunday when weekStart is "sunday" (the Settings option).
+ */
+export function startOfWeek(iso, weekStart = 'monday') {
+  const day = parseISODate(iso).getDay();   // 0 = Sunday, 1 = Monday ... 6 = Saturday
+  const first = weekStart === 'sunday' ? 0 : 1;
+  const back = (day - first + 7) % 7;       // how many days since the week began
   return addDays(iso, -back);
 }
 

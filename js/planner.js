@@ -7,7 +7,7 @@
 //
 //   Day view   an hour-by-hour timeline. Click an empty hour to add an
 //              activity there; overlapping sessions sit side by side.
-//   Week view  Monday to Sunday, with how busy each day is.
+//   Week view  seven days from Monday (or Sunday, see Settings), with how busy each day is.
 //   Aside      "Not planned yet": open tasks with no work session, each
 //              with a button to plan it on the selected day.
 // =============================================================================
@@ -15,7 +15,7 @@
 import { todayISO, addDays, startOfWeek, parseISODate, formatLongDate, formatDayMonth, formatShortDate, escapeHTML } from './utils.js';
 import { icons } from './icons.js';
 import { showToast } from './ui.js';
-import { getTasks, getTask, getCategory, updateTask, restoreTask } from './store.js';
+import { getTasks, getTask, getCategory, getSettings, updateTask, restoreTask } from './store.js';
 import {
   isDone, isOverdue, dueLabel, compareByDue, compareBySession,
   sessionSpan, sessionLabel, layoutSessions, fromMinutes,
@@ -100,13 +100,16 @@ function draw(container) {
   connectButtons(container);
 }
 
-/** The line under the title: one day, or the Monday–Sunday range. */
+/** The first day of the selected week (Monday, or Sunday if chosen in Settings). */
+const weekStartDate = () => startOfWeek(state.date, getSettings().weekStart);
+
+/** The line under the title: one day, or the seven-day range. */
 function rangeLabel() {
   if (state.view === 'day') {
     return state.date === todayISO() ? `Today · ${formatLongDate(state.date)}` : formatLongDate(state.date);
   }
-  const monday = startOfWeek(state.date);
-  return `${formatDayMonth(monday)} – ${formatDayMonth(addDays(monday, 6))}`;
+  const first = weekStartDate();
+  return `${formatDayMonth(first)} – ${formatDayMonth(addDays(first, 6))}`;
 }
 
 /** The gentle amber warning shown when sessions overlap (decision 13). */
@@ -217,14 +220,14 @@ function formatDuration(minutes) {
 }
 
 function weekView(tasks) {
-  const monday = startOfWeek(state.date);
+  const first = weekStartDate();
   const today = todayISO();
   const heads = [];
   const columns = [];
   let daysWithOverlaps = 0;
 
   for (let i = 0; i < 7; i++) {
-    const iso = addDays(monday, i);
+    const iso = addDays(first, i);
     const date = parseISODate(iso);
     const name = date.toLocaleDateString('en-GB', { weekday: 'short' });
     const day = sessionsOn(tasks, iso).sort(compareBySession);

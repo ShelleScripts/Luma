@@ -10,6 +10,8 @@ const svg = (size, body, extra = '') =>
 export const icons = {
   plus: (s = 14) => svg(s, '<path d="M8 3v10M3 8h10"/>', 'stroke-width="1.75"'),
   calendar: (s = 14) => svg(s, '<rect x="2.5" y="3.5" width="11" height="10" rx="2"/><path d="M2.5 6.75h11M5.5 2v3M10.5 2v3"/>'),
+  download: (s = 14) => svg(s, '<path d="M8 2.5v7.5M4.75 6.75 8 10l3.25-3.25M3 13.5h10"/>'),
+  upload: (s = 14) => svg(s, '<path d="M8 10.5V3M4.75 6.25 8 3l3.25 3.25M3 13.5h10"/>'),
   clock: (s = 16) => svg(s, '<circle cx="8" cy="8" r="5.75"/><path d="M8 5v3.2l2 1.3"/>'),
   check: (s = 16) => svg(s, '<rect x="2.5" y="2.5" width="11" height="11" rx="3"/><path d="M5.5 8.2l1.8 1.8 3.2-3.8"/>'),
   book: (s = 16) => svg(s, '<path d="M2.5 3.5h4a1.5 1.5 0 0 1 1.5 1.5v8a1.5 1.5 0 0 0-1.5-1.5h-4zM13.5 3.5h-4A1.5 1.5 0 0 0 8 5v8a1.5 1.5 0 0 1 1.5-1.5h4z"/>'),
