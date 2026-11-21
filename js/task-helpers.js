@@ -185,3 +185,15 @@ export function relativeDue(task, today = todayISO()) {
   if (days === 1) return 'Due tomorrow';
   return `Due in ${days} days`;
 }
+
+/** Sort helper: most urgent priority first, then earliest deadline. */
+export function compareByPriority(a, b) {
+  const rank = PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority];
+  return rank !== 0 ? rank : compareByDue(a, b);
+}
+
+/** Sort helper: most recently created first. */
+export function compareByNewest(a, b) {
+  if (a.createdAt === b.createdAt) return 0;
+  return a.createdAt < b.createdAt ? 1 : -1;
+}
